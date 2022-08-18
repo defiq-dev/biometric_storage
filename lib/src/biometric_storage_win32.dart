@@ -21,7 +21,7 @@ class Win32BiometricStoragePlugin extends BiometricStorage {
   }
 
   @override
-  Future<CanAuthenticateResponse> canAuthenticate() async {
+  Future<CanAuthenticateResponse> canAuthenticate({bool requireStrongBiometric: false}) async {
     return CanAuthenticateResponse.errorHwUnavailable;
   }
 
@@ -75,8 +75,7 @@ class Win32BiometricStoragePlugin extends BiometricStorage {
         if (errorCode == ERROR_NOT_FOUND) {
           _logger.fine('Unable to find credential of name $name');
         } else {
-          _logger.warning('Error: $errorCode ',
-              WindowsException(HRESULT_FROM_WIN32(errorCode)));
+          _logger.warning('Error: $errorCode ', WindowsException(HRESULT_FROM_WIN32(errorCode)));
         }
         return null;
       }
@@ -119,8 +118,7 @@ class Win32BiometricStoragePlugin extends BiometricStorage {
       final result = CredWrite(credential, 0);
       if (result != TRUE) {
         final errorCode = GetLastError();
-        throw BiometricStorageException(
-            'Error writing credential $name ($result): $errorCode');
+        throw BiometricStorageException('Error writing credential $name ($result): $errorCode');
       }
     } finally {
       _logger.fine('free');

@@ -103,8 +103,7 @@ class StorageFileInitOptions {
   final bool androidBiometricOnly;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'authenticationValidityDurationSeconds':
-            authenticationValidityDurationSeconds,
+        'authenticationValidityDurationSeconds': authenticationValidityDurationSeconds,
         'authenticationRequired': authenticationRequired,
         'androidBiometricOnly': androidBiometricOnly,
       };
@@ -193,7 +192,7 @@ abstract class BiometricStorage extends PlatformInterface {
 
   /// Returns whether this device supports biometric/secure storage or
   /// the reason [CanAuthenticateResponse] why it is not supported.
-  Future<CanAuthenticateResponse> canAuthenticate();
+  Future<CanAuthenticateResponse> canAuthenticate({bool requireStrongBiometric: false});
 
   /// Returns true when there is an AppArmor error when trying to read a value.
   ///
@@ -248,15 +247,14 @@ class MethodChannelBiometricStorage extends BiometricStorage {
   static const MethodChannel _channel = MethodChannel('biometric_storage');
 
   @override
-  Future<CanAuthenticateResponse> canAuthenticate() async {
+  Future<CanAuthenticateResponse> canAuthenticate({bool requireStrongBiometric = false}) async {
     if (kIsWeb) {
       return CanAuthenticateResponse.unsupported;
     }
-    if (Platform.isAndroid ||
-        Platform.isIOS ||
-        Platform.isMacOS ||
-        Platform.isLinux) {
-      final response = await _channel.invokeMethod<String>('canAuthenticate');
+    if (Platform.isAndroid || Platform.isIOS || Platform.isMacOS || Platform.isLinux) {
+      final response = await _channel.invokeMethod<String>('canAuthenticate', <String, dynamic>{
+        'requireStrongBiometric': requireStrongBiometric,
+      });
       final ret = _canAuthenticateMapping[response];
       if (ret == null) {
         throw StateError('Invalid response from native platform. {$response}');
@@ -284,8 +282,8 @@ class MethodChannelBiometricStorage extends BiometricStorage {
     if (!Platform.isLinux) {
       return false;
     }
-    final tmpStorage = await getStorage('appArmorCheck',
-        options: StorageFileInitOptions(authenticationRequired: false));
+    final tmpStorage =
+        await getStorage('appArmorCheck', options: StorageFileInitOptions(authenticationRequired: false));
     _logger.finer('Checking app armor');
     try {
       await tmpStorage.read();
@@ -295,8 +293,7 @@ class MethodChannelBiometricStorage extends BiometricStorage {
       if (e.code == AuthExceptionCode.linuxAppArmorDenied) {
         return true;
       }
-      _logger.warning(
-          'Unknown error while checking for app armor.', e, stackTrace);
+      _logger.warning('Unknown error while checking for app armor.', e, stackTrace);
       // some other weird error?
       rethrow;
     }
@@ -330,8 +327,7 @@ class MethodChannelBiometricStorage extends BiometricStorage {
         promptInfo,
       );
     } catch (e, stackTrace) {
-      _logger.warning(
-          'Error while initializing biometric storage.', e, stackTrace);
+      _logger.warning('Error while initializing biometric storage.', e, stackTrace);
       rethrow;
     }
   }
@@ -371,13 +367,9 @@ class MethodChannelBiometricStorage extends BiometricStorage {
   Map<String, dynamic> _promptInfoForCurrentPlatform(PromptInfo promptInfo) {
     // Don't expose Android configurations to other platforms
     if (Platform.isAndroid) {
-      return <String, dynamic>{
-        'androidPromptInfo': promptInfo.androidPromptInfo._toJson()
-      };
+      return <String, dynamic>{'androidPromptInfo': promptInfo.androidPromptInfo._toJson()};
     } else if (Platform.isIOS) {
-      return <String, dynamic>{
-        'iosPromptInfo': promptInfo.iosPromptInfo._toJson()
-      };
+      return <String, dynamic>{'iosPromptInfo': promptInfo.iosPromptInfo._toJson()};
     } else if (Platform.isMacOS) {
       return <String, dynamic>{
         // This is no typo, we use the same implementation on iOS and MacOS,
@@ -393,13 +385,9 @@ class MethodChannelBiometricStorage extends BiometricStorage {
     }
   }
 
-  Future<T> _transformErrors<T>(Future<T> future) =>
-      future.catchError((Object error, StackTrace stackTrace) {
+  Future<T> _transformErrors<T>(Future<T> future) => future.catchError((Object error, StackTrace stackTrace) {
         if (error is PlatformException) {
-          _logger.finest(
-              'Error during plugin operation (details: ${error.details})',
-              error,
-              stackTrace);
+          _logger.finest('Error during plugin operation (details: ${error.details})', error, stackTrace);
           if (error.code.startsWith('AuthError:')) {
             return Future<T>.error(
               AuthException(
@@ -411,13 +399,9 @@ class MethodChannelBiometricStorage extends BiometricStorage {
           }
           if (error.details is Map) {
             final message = error.details['message'] as String;
-            if (message.contains('org.freedesktop.DBus.Error.AccessDenied') ||
-                message.contains('AppArmor')) {
+            if (message.contains('org.freedesktop.DBus.Error.AccessDenied') || message.contains('AppArmor')) {
               _logger.fine('Got app armor error.');
-              return Future<T>.error(
-                  AuthException(
-                      AuthExceptionCode.linuxAppArmorDenied, error.message!),
-                  stackTrace);
+              return Future<T>.error(AuthException(AuthExceptionCode.linuxAppArmorDenied, error.message!), stackTrace);
             }
           }
         }
@@ -434,14 +418,12 @@ class BiometricStorageFile {
 
   /// read from the secure file and returns the content.
   /// Will return `null` if file does not exist.
-  Future<String?> read({PromptInfo? promptInfo}) =>
-      _plugin.read(name, promptInfo ?? defaultPromptInfo);
+  Future<String?> read({PromptInfo? promptInfo}) => _plugin.read(name, promptInfo ?? defaultPromptInfo);
 
   /// Write content of this file. Previous value will be overwritten.
   Future<void> write(String content, {PromptInfo? promptInfo}) =>
       _plugin.write(name, content, promptInfo ?? defaultPromptInfo);
 
   /// Delete the content of this storage.
-  Future<void> delete({PromptInfo? promptInfo}) =>
-      _plugin.delete(name, promptInfo ?? defaultPromptInfo);
+  Future<void> delete({PromptInfo? promptInfo}) => _plugin.delete(name, promptInfo ?? defaultPromptInfo);
 }

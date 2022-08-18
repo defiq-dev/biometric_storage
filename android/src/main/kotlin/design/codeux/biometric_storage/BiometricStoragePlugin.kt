@@ -95,6 +95,7 @@ class BiometricStoragePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         const val PARAM_NAME = "name"
         const val PARAM_WRITE_CONTENT = "content"
         const val PARAM_ANDROID_PROMPT_INFO = "androidPromptInfo"
+        const val PARAM_REQUIRE_STRONG_BIOMETRIC = "requireStrongBiometric"
 
     }
 
@@ -141,6 +142,10 @@ class BiometricStoragePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
                         confirmationRequired = it["confirmationRequired"] as Boolean,
                     )
                 }
+            }
+
+            val getRequireStrongBiometric = {
+                requiredArgument<Boolean>(PARAM_REQUIRE_STRONG_BIOMETRIC)
             }
 
             fun withStorage(cb: BiometricStorageFile.() -> Unit) {
@@ -205,7 +210,7 @@ class BiometricStoragePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
             }
 
             when (call.method) {
-                "canAuthenticate" -> result.success(canAuthenticate().name)
+                "canAuthenticate" -> result.success(canAuthenticate(requireStrongBiometric = getRequireStrongBiometric()).name)
                 "init" -> {
                     val name = getName()
                     if (storageFiles.containsKey(name)) {
@@ -316,10 +321,13 @@ class BiometricStoragePlugin : FlutterPlugin, ActivityAware, MethodCallHandler {
         }
     }
 
-    private fun canAuthenticate(): CanAuthenticateResponse {
-        val response = biometricManager.canAuthenticate(
+    private fun canAuthenticate(requireStrongBiometric: Boolean): CanAuthenticateResponse {
+        val strength = if (requireStrongBiometric) {
+            BIOMETRIC_STRONG
+        } else {
             BIOMETRIC_STRONG or BIOMETRIC_WEAK
-        )
+        }
+        val response = biometricManager.canAuthenticate(strength)
         return CanAuthenticateResponse.values().firstOrNull { it.code == response }
             ?: throw Exception(
                 "Unknown response code {$response} (available: ${
